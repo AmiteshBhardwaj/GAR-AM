@@ -94,6 +94,7 @@ export default function App() {
   // Game Setup & Configuration
   const [playerName, setPlayerName] = useState('REVISER');
   const [difficulty, setDifficulty] = useState('Medium');
+  const [totalRounds, setTotalRounds] = useState(6);
   const [questionCount, setQuestionCount] = useState(10);
 
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('active_recall_sound') !== 'off');
@@ -140,15 +141,10 @@ export default function App() {
   const [highRiskTotal, setHighRiskTotal] = useState(0);
 
   function getRoundConfig(round) {
-    const configs = {
-      1: { chambers: 6, bullets: 1 }, // 16.7%
-      2: { chambers: 6, bullets: 2 }, // 33.3%
-      3: { chambers: 6, bullets: 3 }, // 50.0%
-      4: { chambers: 6, bullets: 4 }, // 66.7%
-      5: { chambers: 6, bullets: 5 }, // 83.3%
-      6: { chambers: 6, bullets: 6 }, // 100% INSTANT DEATH ROUND
-    };
-    return configs[round] || configs[6];
+    const chambers = 6;
+    let bullets = Math.round((6 / totalRounds) * round);
+    bullets = Math.max(1, Math.min(6, bullets));
+    return { chambers, bullets };
   }
 
   // Active Gameplay Phase
@@ -543,7 +539,7 @@ export default function App() {
 
   // Next Question/Round transitions
   const handleNextQuestion = () => {
-    // Game no longer ends on lives, it always plays all 6 rounds.
+    // Game no longer ends on lives, it always plays all totalRounds.
 
     const config = getRoundConfig(roundNumber);
     const allShotsFired = shotsFiredThisRound >= config.chambers;
@@ -551,7 +547,7 @@ export default function App() {
     if (allShotsFired) {
       const nextRound = roundNumber + 1;
       
-      if (nextRound > 6) {
+      if (nextRound > totalRounds) {
         endSession();
         return;
       }
@@ -832,6 +828,8 @@ export default function App() {
                 setDifficulty={setDifficulty}
                 questionCount={questionCount}
                 setQuestionCount={setQuestionCount}
+                totalRounds={totalRounds}
+                setTotalRounds={setTotalRounds}
                 onStart={handleStartGame}
 
                 soundEnabled={soundEnabled}

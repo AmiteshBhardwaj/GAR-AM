@@ -29,6 +29,8 @@ export default function HomeScreen({
   setDifficulty,
   questionCount,
   setQuestionCount,
+  totalRounds,
+  setTotalRounds,
   onStart,
 
   pdfParsedText,
@@ -354,7 +356,28 @@ export default function HomeScreen({
                   ))}
                 </div>
               </div>
-
+              {/* Total Rounds */}
+              <div className="flex flex-col gap-1.5 mt-2">
+                <label className="text-[10px] uppercase text-[#57534e]">
+                  Total Rounds
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setTotalRounds(count)}
+                      className={`flex flex-col items-center justify-center flex-1 h-[42px] rounded-[6px] transition-all cursor-pointer border ${
+                        totalRounds === count 
+                          ? 'bg-[rgba(245,158,11,0.15)] border-[#f59e0b] text-[#f59e0b]' 
+                          : 'bg-transparent border-[rgba(255,255,255,0.08)] text-[#57534e]'
+                      }`}
+                    >
+                      <span className={`text-[13px] leading-tight ${totalRounds === count ? 'font-bold' : ''}`}>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Start Button */}
               <button

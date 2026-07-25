@@ -78,11 +78,10 @@ export default function HistoryScreen({ scores = [], onBack, onClear }) {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-[20px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px]">
           {[
             { label: 'TOTAL SESSIONS', value: totalSessions, icon: CalendarClock },
-            { label: 'BEST ACCURACY', value: `${bestAccuracy}%`, icon: Target },
-            { label: 'BEST ROUNDS', value: bestRounds, icon: Shield }
+            { label: 'BEST ACCURACY', value: `${bestAccuracy}%`, icon: Target }
           ].map((stat, idx) => (
             <motion.div 
               key={idx}
@@ -149,7 +148,6 @@ export default function HistoryScreen({ scores = [], onBack, onClear }) {
                       <th className="p-[16px_12px] font-normal">STUDENT ALIAS</th>
                       <th className="p-[16px_12px] font-normal">ACCURACY</th>
                       <th className="p-[16px_12px] font-normal">CORRECT SELECTIONS</th>
-                      <th className="p-[16px_12px] font-normal">ROUNDS</th>
                       <th className="p-[16px_12px] font-normal">MAX RISK SURVIVED</th>
                       <th className="p-[16px_12px] font-normal">STATUS</th>
                     </tr>
@@ -177,7 +175,6 @@ export default function HistoryScreen({ scores = [], onBack, onClear }) {
                           <td className="p-[12px] text-[#ffffff] text-[13px]">
                             {score.correctAnswers ?? 0}/{score.totalQuestionsAnswered ?? 0}
                           </td>
-                          <td className="p-[12px] text-[#ffffff] text-[13px]">{score.roundsSurvived}</td>
                           <td className={`p-[12px] text-[13px] ${maxRiskNum > 50 ? 'text-[#f59e0b]' : 'text-[#a8a29e]'}`}>
                             {maxRiskNum.toFixed(0)}%
                           </td>
@@ -234,10 +231,6 @@ export default function HistoryScreen({ scores = [], onBack, onClear }) {
                         <div className="flex flex-col">
                           <span className="text-[#57534e] uppercase text-[9px] tracking-wider">Selections</span>
                           <span className="text-[#ffffff]">{score.correctAnswers ?? 0}/{score.totalQuestionsAnswered ?? 0}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[#57534e] uppercase text-[9px] tracking-wider">Rounds</span>
-                          <span className="text-[#ffffff]">{score.roundsSurvived}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[#57534e] uppercase text-[9px] tracking-wider">Max Risk</span>
