@@ -1,4 +1,127 @@
-export const DEFAULT_CS_QUESTIONS = [];
+export const FIXED_TEST_QUESTIONS = [
+  {
+    question: "What is the primary function of the Program Counter (PC) in a CPU?",
+    options: {
+      A: "Stores the address of the next instruction to be fetched",
+      B: "Performs arithmetic and logic operations",
+      C: "Holds the currently executing instruction data",
+      D: "Manages power distribution to processor cores"
+    },
+    correctAnswer: "A"
+  },
+  {
+    question: "Which data structure operates strictly on a Last-In, First-Out (LIFO) principle?",
+    options: {
+      A: "Queue",
+      B: "Stack",
+      C: "Binary Search Tree",
+      D: "Linked List"
+    },
+    correctAnswer: "B"
+  },
+  {
+    question: "What is the average time complexity of searching an element in a balanced Binary Search Tree?",
+    options: {
+      A: "O(1)",
+      B: "O(n)",
+      C: "O(log n)",
+      D: "O(n log n)"
+    },
+    correctAnswer: "C"
+  },
+  {
+    question: "In relational database systems, what does the ACID acronym stand for?",
+    options: {
+      A: "Atomicity, Consistency, Isolation, Durability",
+      B: "Accuracy, Concurrency, Integrity, Distribution",
+      C: "Allocation, Control, Indexing, Data",
+      D: "Authentication, Compression, Iteration, Deletion"
+    },
+    correctAnswer: "A"
+  },
+  {
+    question: "Which layer of the OSI model is responsible for end-to-end communication and port addressing?",
+    options: {
+      A: "Data Link Layer",
+      B: "Network Layer",
+      C: "Transport Layer",
+      D: "Session Layer"
+    },
+    correctAnswer: "C"
+  },
+  {
+    question: "What mechanism allows multiple processes to share CPU time by saving and restoring state?",
+    options: {
+      A: "Context Switching",
+      B: "Memory Paging",
+      C: "Deadlock Detection",
+      D: "Garbage Collection"
+    },
+    correctAnswer: "A"
+  },
+  {
+    question: "In cryptography, what type of encryption uses a public key for encryption and a private key for decryption?",
+    options: {
+      A: "Symmetric Encryption",
+      B: "Asymmetric Encryption",
+      C: "One-Way Hashing",
+      D: "Stream Cipher"
+    },
+    correctAnswer: "B"
+  },
+  {
+    question: "Which CPU cache level is closest to the processor execution core and operates with the lowest latency?",
+    options: {
+      A: "L3 Cache",
+      B: "L2 Cache",
+      C: "L1 Cache",
+      D: "Main RAM"
+    },
+    correctAnswer: "C"
+  },
+  {
+    question: "What type of hazard in a CPU pipeline occurs when an instruction depends on the result of a previous instruction?",
+    options: {
+      A: "Structural Hazard",
+      B: "Data Hazard",
+      C: "Control Hazard",
+      D: "Branch Hazard"
+    },
+    correctAnswer: "B"
+  },
+  {
+    question: "Which HTTP status code signifies that a resource was successfully created on the server?",
+    options: {
+      A: "200 OK",
+      B: "201 Created",
+      C: "204 No Content",
+      D: "301 Moved Permanently"
+    },
+    correctAnswer: "B"
+  },
+  {
+    question: "In Git, which command creates a new branch and immediately switches to it in one action?",
+    options: {
+      A: "git branch -n <branch>",
+      B: "git checkout -b <branch>",
+      C: "git commit -m <branch>",
+      D: "git merge <branch>"
+    },
+    correctAnswer: "B"
+  },
+  {
+    question: "What is the primary purpose of virtual memory paging in modern operating systems?",
+    options: {
+      A: "Enables processes to access isolated virtual address space and utilize secondary storage as RAM",
+      B: "Increases CPU clock frequency dynamically",
+      C: "Encrypts hard drive sectors automatically",
+      D: "Replaces motherboard BIOS firmware"
+    },
+    correctAnswer: "A"
+  }
+];
+
+export const DEFAULT_CS_QUESTIONS = FIXED_TEST_QUESTIONS;
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
@@ -155,7 +278,8 @@ export const generateQuestions = async (text, apiKey = null) => {
     }
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+      const model = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.6-flash';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
       const sourceExcerpt = cleanText; // Full text with no page limit or truncation
 
       const prompt = `You are generating revision quiz questions from the user's uploaded PDF/notes.

@@ -42,7 +42,9 @@ export default function HomeScreen({
   onParsePdf,
   isGenerating,
   gameStartError,
-  setGameStartError
+  setGameStartError,
+  selectedCharacter = 'spartan',
+  setSelectedCharacter
 }) {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
@@ -223,7 +225,7 @@ export default function HomeScreen({
                   <button
                     type="button"
                     onClick={() => { setSourceType('pdf'); clearPdf(); }}
-                    className={`flex-1 h-[38px] text-[13px] rounded-[8px] transition-all cursor-pointer border ${
+                    className={`flex-1 h-[38px] text-[12px] font-medium rounded-[8px] transition-all cursor-pointer border ${
                       sourceType === 'pdf' 
                         ? 'bg-[rgba(245,158,11,0.15)] border-[#f59e0b] text-[#f59e0b]' 
                         : 'bg-transparent border-[rgba(255,255,255,0.1)] text-[#a8a29e]'
@@ -234,17 +236,51 @@ export default function HomeScreen({
                   <button
                     type="button"
                     onClick={() => { setSourceType('text'); clearPdf(); }}
-                    className={`flex-1 h-[38px] text-[13px] rounded-[8px] transition-all cursor-pointer border ${
+                    className={`flex-1 h-[38px] text-[12px] font-medium rounded-[8px] transition-all cursor-pointer border ${
                       sourceType === 'text' 
                         ? 'bg-[rgba(245,158,11,0.15)] border-[#f59e0b] text-[#f59e0b]' 
                         : 'bg-transparent border-[rgba(255,255,255,0.1)] text-[#a8a29e]'
                     }`}
                   >
-                    Paste Text Notes
+                    Paste Notes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSourceType('demo');
+                      setPdfParsedText('TEST_DECK');
+                      setPdfFileName('Fixed Test Question Deck (12 MCQs)');
+                      setParseError(null);
+                    }}
+                    className={`flex-1 h-[38px] text-[12px] font-medium rounded-[8px] transition-all cursor-pointer border flex items-center justify-center gap-1.5 ${
+                      sourceType === 'demo' 
+                        ? 'bg-[rgba(245,158,11,0.2)] border-[#f59e0b] text-[#f59e0b] font-bold shadow-[0_0_12px_rgba(245,158,11,0.25)]' 
+                        : 'bg-transparent border-[rgba(255,255,255,0.1)] text-[#a8a29e] hover:border-[rgba(245,158,11,0.3)]'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#f59e0b]" />
+                    Test Deck
                   </button>
                 </div>
 
-                {sourceType === 'pdf' ? (
+                {sourceType === 'demo' ? (
+                  <div 
+                    className="border border-[#f59e0b] h-[72px] rounded-[8px] flex items-center justify-between px-4"
+                    style={{ backgroundColor: 'rgba(245,158,11,0.08)' }}
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <Sparkles className="w-5 h-5 text-[#f59e0b]" />
+                      <div className="text-left truncate">
+                        <p className="text-[13px] text-white font-medium truncate max-w-[280px]">
+                          Standard CS Test Question Deck
+                        </p>
+                        <p className="text-[11px] text-[#f59e0b] flex items-center gap-1 mt-0.5">
+                          <CheckCircle className="w-3.5 h-3.5" /> 12 Fixed Questions Mounted (Instant Play)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : sourceType === 'pdf' ? (
                   !pdfFileName ? (
                     <>
                       <input
@@ -269,7 +305,7 @@ export default function HomeScreen({
                       >
                         <Upload className="w-5 h-5 text-[#f59e0b]" />
                         <span className="text-[13px] text-[#a8a29e]">
-                          Click or drag to upload
+                          Click or drag to upload PDF
                         </span>
                       </div>
                     </>
@@ -328,6 +364,38 @@ export default function HomeScreen({
                   </p>
                 )}
               </div>
+
+              {/* 3D Opponent Avatar Selector */}
+              {setSelectedCharacter && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] uppercase text-[#57534e] flex items-center justify-between">
+                    <span>Opponent Model (3D)</span>
+                    <span className="text-[#f59e0b] font-mono text-[9px]">GLB ANIMATED</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 'sitting_bot', label: 'SEATED BOT', sub: 'Mixamo Rig' },
+                      { id: 'spartan', label: 'SPARTAN', sub: 'Mk V Armor' },
+                      { id: 'zombie', label: 'ZOMBIE', sub: 'Undead' },
+                      { id: 'cyborg', label: 'CYBORG', sub: 'Warden' }
+                    ].map(({ id, label, sub }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setSelectedCharacter(id)}
+                        className={`flex flex-col items-center justify-center flex-1 h-[42px] rounded-[6px] transition-all cursor-pointer border ${
+                          selectedCharacter === id 
+                            ? 'bg-[rgba(245,158,11,0.15)] border-[#f59e0b] text-[#f59e0b]' 
+                            : 'bg-transparent border-[rgba(255,255,255,0.08)] text-[#57534e] hover:border-[rgba(255,255,255,0.2)]'
+                        }`}
+                      >
+                        <span className={`text-[11px] leading-tight ${selectedCharacter === id ? 'font-bold' : ''}`}>{label}</span>
+                        <span className="text-[9px] opacity-70 leading-tight">{sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Difficulty / Timer Mode */}
               <div className="flex flex-col gap-1.5">

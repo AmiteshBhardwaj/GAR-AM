@@ -35,7 +35,7 @@ By combining AI-powered question generation with Russian Roulette mechanics, thi
 | **[Vite](https://vitejs.dev/)** | Provides lightning-fast HMR (Hot Module Replacement) and optimized production builds. |
 | **[Tailwind CSS v4](https://tailwindcss.com/)** | Utility-first styling used to construct the gritty, dark-mode tactical terminal aesthetic. |
 | **[Framer Motion](https://www.framer.com/motion/)** | Drives the complex, physics-based animations, layout transitions, and screen glitch effects (like camera shake on bullet impacts). |
-| **[Google Gemini API](https://aistudio.google.com/)** | (gemini-2.5-flash) Serves as the backbone of the dynamic game engine. Parses raw text to instantly generate context-aware, multiple-choice study questions on the fly. |
+| **[Google Gemini API](https://aistudio.google.com/)** | (gemini-3.6-flash) Serves as the backbone of the dynamic game engine. Parses raw text to instantly generate context-aware, multiple-choice study questions on the fly. |
 | **[pdfjs-dist](https://mozilla.github.io/pdf.js/)** | Mozilla's robust PDF parser. Processes uploaded study materials 100% locally in the browser to extract text without any server overhead or privacy leaks. |
 | **[Lucide React](https://lucide.dev/)** | Crisp, tactical vector icons used across the dashboard (Skulls, Crosshairs, Shields). |
 | **HTML5 Audio API** | Native browser audio capabilities used to trigger dynamic, high-fidelity sound effects (revolver clicks, explosive bangs, tension heartbeat). |

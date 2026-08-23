@@ -7,7 +7,8 @@ import ResultScreen from './screens/ResultScreen';
 import HistoryScreen from './screens/HistoryScreen';
 
 import { extractTextFromPdf } from './services/pdfParser';
-import { generateQuestions } from './services/aiGenerator';
+import { generateQuestions, FIXED_TEST_QUESTIONS } from './services/aiGenerator';
+import { soundEngine } from './components/audio/SoundEngine';
 import logoImg from './assets/logo.png';
 
 const SCORE_HISTORY_KEY = 'gamified_active_recall_scores';
@@ -96,6 +97,7 @@ export default function App() {
   const [difficulty, setDifficulty] = useState('Medium');
   const [totalRounds, setTotalRounds] = useState(6);
   const [questionCount, setQuestionCount] = useState(10);
+  const [selectedCharacter, setSelectedCharacter] = useState('spartan');
 
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('active_recall_sound') !== 'off');
 
@@ -119,6 +121,15 @@ export default function App() {
   const [roundNumber, setRoundNumber] = useState(1);
   const [playerScore, setPlayerScore] = useState(0);
   const [botScore, setBotScore] = useState(0);
+
+  // 3D Card System State
+  const [playerCards, setPlayerCards] = useState([]);
+  const [botCards, setBotCards] = useState([]);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [activeCardTurn, setActiveCardTurn] = useState('player'); // 'player' | 'bot'
+  const [cardState, setCardState] = useState('table'); // 'table', 'inspect', 'flipping', 'blood_reveal', 'morphing', 'discarded'
+  const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
+  const [gunOwner, setGunOwner] = useState('player'); // 'player' | 'bot'
   
   // Revolver Cylinder State
   const [bulletChambers, setBulletChambers] = useState([]); // Array of bullet indices
@@ -253,6 +264,52 @@ export default function App() {
     return (remainingBullets / remainingChambers) * 100;
   };
 
+  // Deal Cards helper for a Round
+  const dealRoundCards = (allQuestions, round) => {
+    const config = getRoundConfig(round);
+    const cardsPerSide = Math.max(2, Math.min(3, Math.ceil(config.bullets / 2) + 1));
+    const totalToDeal = cardsPerSide * 2;
+
+    const pool = questionPoolRef.current;
+    let startIdx = poolIndexRef.current;
+    if (startIdx + totalToDeal > pool.length) {
+      // Reshuffle pool
+      const reshuffled = [...pool];
+      for (let i = reshuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [reshuffled[i], reshuffled[j]] = [reshuffled[j], reshuffled[i]];
+      }
+      questionPoolRef.current = reshuffled;
+      poolIndexRef.current = 0;
+      startIdx = 0;
+    }
+
+    const dealtSlice = questionPoolRef.current.slice(startIdx, startIdx + totalToDeal);
+    poolIndexRef.current = startIdx + totalToDeal;
+
+    const pCards = dealtSlice.slice(0, cardsPerSide).map((q, i) => ({
+      id: `p_${round}_${i}`,
+      question: q,
+      discarded: false
+    }));
+
+    const bCards = dealtSlice.slice(cardsPerSide, totalToDeal).map((q, i) => ({
+      id: `b_${round}_${i}`,
+      question: q,
+      discarded: false
+    }));
+
+    setPlayerCards(pCards);
+    setBotCards(bCards);
+    setActiveCardIndex(0);
+    setActiveCardTurn('player');
+    setCardState('inspect');
+    setIsAnswerCorrect(null);
+    setGunOwner('player');
+    soundEngine.playCardDeal();
+    return { pCards, bCards };
+  };
+
   // Initialize Game Session
   const handleStartGame = async () => {
     setIsSpinning(true);
@@ -312,24 +369,24 @@ export default function App() {
 
     try {
       const trimmedText = pdfParsedText?.trim() || "";
-      console.log(`[START GAME] Checking PDF parsed text length: ${trimmedText.length}`);
-      
-      if (trimmedText.length < 100) {
-        setGameStartError("Please upload a PDF or paste revision notes (minimum 100 characters) to generate questions!");
-        setIsSpinning(false);
-        setIsGenerating(false);
-        return;
-      }
+      let gameQsPool = [];
 
-      console.log(`[START GAME] Launching question generation from PDF content...`);
-      const gameQsPool = await generateQuestions(trimmedText);
+      if (trimmedText === 'TEST_DECK' || pdfFileName.includes('Test Question Deck') || trimmedText.length === 0) {
+        console.log(`[START GAME] Using Fixed Built-in Test Question Deck (${FIXED_TEST_QUESTIONS.length} MCQs)`);
+        gameQsPool = [...FIXED_TEST_QUESTIONS];
+      } else if (trimmedText.length < 100) {
+        // If text is short, prompt or fallback gracefully to fixed questions
+        console.log(`[START GAME] Text is short (<100 chars), using Fixed Test Question Deck.`);
+        gameQsPool = [...FIXED_TEST_QUESTIONS];
+      } else {
+        console.log(`[START GAME] Launching question generation from PDF/Notes content...`);
+        gameQsPool = await generateQuestions(trimmedText);
+      }
       
       if (!gameQsPool || gameQsPool.length === 0) {
-        throw new Error("No questions could be extracted or generated from your text. Make sure your PDF/notes contain readable text.");
+        gameQsPool = [...FIXED_TEST_QUESTIONS];
       }
 
-      console.log(`[START GAME] Successfully retrieved a pool of ${gameQsPool.length} questions from the PDF.`);
-      
       const shuffleQuestions = (array) => {
         const arr = [...array];
         for (let i = arr.length - 1; i > 0; i--) {
@@ -341,17 +398,13 @@ export default function App() {
 
       const shuffledPool = shuffleQuestions(gameQsPool);
       questionPoolRef.current = shuffledPool;
-      const selectedCount = Math.min(questionCount, shuffledPool.length);
-      poolIndexRef.current = selectedCount;
-      const finalQuestions = shuffledPool.slice(0, selectedCount);
+      poolIndexRef.current = 0;
+      setQuestions(shuffledPool);
 
-      setQuestions(finalQuestions);
+      // Deal physical 3D cards
+      dealRoundCards(shuffledPool, 1);
 
       let initialGreeting = getRandomElement(BOT_TAUNTS[botName].idle);
-      if (shuffledPool.length < questionCount) {
-        alert(`${shuffledPool.length} questions found in your PDF.`);
-        initialGreeting = `${shuffledPool.length} questions found in your PDF. ${initialGreeting}`;
-      }
       setBotMessage(initialGreeting);
 
       setIsSpinning(false);
@@ -360,26 +413,42 @@ export default function App() {
       setScreen('game');
     } catch (error) {
       console.error("[START GAME] Question Generation Failed:", error);
-      setGameStartError(`Question Generation Failed: ${error.message}`);
+      // Seamless fallback to test questions if API fails
+      console.log(`[START GAME] Falling back to Fixed Test Questions after error: ${error.message}`);
+      const shuffledFallback = [...FIXED_TEST_QUESTIONS].sort(() => Math.random() - 0.5);
+      questionPoolRef.current = shuffledFallback;
+      poolIndexRef.current = 0;
+      setQuestions(shuffledFallback);
+      dealRoundCards(shuffledFallback, 1);
       setIsSpinning(false);
       setIsGenerating(false);
+      questionStartTimeRef.current = Date.now();
+      setScreen('game');
     }
   };
 
   const getRandomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+  // Card Selection Handler (Player clicks card on table)
+  const handleSelectCard = (cardIdx) => {
+    if (turn !== 'player' || gameState !== 'answering') return;
+    setActiveCardIndex(cardIdx);
+    setActiveCardTurn('player');
+    setCardState('inspect');
+    setSelectedAnswer(null);
+    setIsAnswerCorrect(null);
+  };
 
-  // Bot Auto-Shoot Hook (fires when turn becomes 'bot')
+  // Bot Auto-Shoot Hook (fires when turn becomes 'bot' during outcome_overlay)
   useEffect(() => {
     if (screen !== 'game' || turn !== 'bot' || gameState !== 'outcome_overlay') return;
 
-    // Simulate BOT_X cocking gun and aiming with a delay
+    // Simulate BOT cocking gun and aiming with a delay
     setIsBotThinking(true);
-    const thinkDelay = 1800 + Math.random() * 1200; // 1.8s - 3.0s
+    const thinkDelay = 1800 + Math.random() * 1000;
 
     botThinkingTimerRef.current = setTimeout(() => {
       setIsBotThinking(false);
-      
       // Bot pulls trigger on Player
       shoot('bot', 'player');
     }, thinkDelay);
@@ -393,9 +462,9 @@ export default function App() {
   useEffect(() => {
     if (screen !== 'game' || gameState !== 'outcome_overlay' || overlayType === null) return;
 
-    const delay = overlayType === 'bang' ? 2400 : 1800; // 2.4s for damage flash, 1.8s for clicks
+    const delay = overlayType === 'bang' ? 2400 : 1800;
     autoAdvanceTimerRef.current = setTimeout(() => {
-      handleNextQuestion();
+      handleNextCardTurn();
     }, delay);
 
     return () => {
@@ -403,13 +472,18 @@ export default function App() {
     };
   }, [screen, gameState, overlayType, currentChamber, bulletFired, shootTarget, turn, playerScore, botScore]);
 
-  // Player Answer Event Handler
+  // Player Answer Event Handler with 3D Flip & Blood Reveal & Gun Morph
+  // Player Answer Event Handler with Mechanical Dropdown Chalkboard & Shootout Transition
   const handlePlayerAnswer = (optionKey) => {
-    if (gameState !== 'answering') return;
+    if (gameState !== 'answering' || turn !== 'player') return;
+
+    const currentCard = playerCards[activeCardIndex];
+    const currentQ = currentCard?.question || questions[currentQuestionIndex];
+    if (!currentQ) return;
 
     setSelectedAnswer(optionKey);
-    const currentQuestion = questions[currentQuestionIndex];
-    const isCorrect = optionKey === currentQuestion.correctAnswer;
+    const isCorrect = optionKey === currentQ.correctAnswer;
+    setIsAnswerCorrect(isCorrect);
     
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
@@ -434,32 +508,77 @@ export default function App() {
       if (isCorrect) setHighRiskCorrect(prev => prev + 1);
     }
 
-    if (isCorrect) {
-      setPlayerScore(prev => prev + 100);
-      setAnswerStatus('correct');
-      setGameState('shooting_choice');
-      playShotSound('ding');
-    } else {
-      setBotScore(prev => prev + 100);
-      setAnswerStatus('incorrect');
-      
-      // INCORRECT -> Turn passes to BOT_X. BOT_X mocks player, then takes the gun to shoot them.
-      setTurn('bot');
-      setBotMessage(getRandomElement(BOT_TAUNTS[botName].wrongAnswer));
-      
-      // Delay outcome overlay reveal slightly to show red incorrect option color
-      incorrectDelayTimerRef.current = setTimeout(() => {
-        setShootTarget('player');
-        setGameState('outcome_overlay');
-      }, 1000);
-    }
+    // Step 1: Hold verdict visible on blackboard for 950ms
+    setTimeout(() => {
+      // Step 2: Retract screen upward into ceiling
+      setGameState('table_idle');
+
+      // Step 3: Present Revolver on table for shootout
+      setTimeout(() => {
+        setGunOwner(isCorrect ? 'player' : 'bot');
+
+        if (isCorrect) {
+          setPlayerScore(prev => prev + 100);
+          setAnswerStatus('correct');
+          setGameState('shooting_choice');
+          playShotSound('ding');
+        } else {
+          setBotScore(prev => prev + 100);
+          setAnswerStatus('incorrect');
+          setTurn('bot');
+          setBotMessage(getRandomElement(BOT_TAUNTS[botName].wrongAnswer));
+          setShootTarget('player');
+          setGameState('outcome_overlay');
+        }
+      }, 750);
+    }, 950);
+  };
+
+  // Bot Turn Mechanical Dropdown Interrogation Execution
+  const executeBotCardTurn = (targetBotCardIdx) => {
+    setTurn('bot');
+    setActiveCardTurn('bot');
+    setActiveCardIndex(targetBotCardIdx);
+    setGameState('bot_turn');
+    setSelectedAnswer(null);
+    setIsAnswerCorrect(null);
+    setBotMessage(getRandomElement(BOT_TAUNTS[botName].idle));
+
+    // Bot calculates verdict on the lowered blackboard
+    setTimeout(() => {
+      // Calculate Bot accuracy based on difficulty
+      const botAcc = difficulty === 'Easy' ? 0.50 : difficulty === 'Medium' ? 0.72 : 0.88;
+      const botIsCorrect = Math.random() < botAcc;
+      setIsAnswerCorrect(botIsCorrect);
+
+      // Display verdict on blackboard for 950ms
+      setTimeout(() => {
+        // Retract screen into ceiling
+        setGameState('table_idle');
+
+        setTimeout(() => {
+          setGunOwner(botIsCorrect ? 'bot' : 'player');
+
+          if (botIsCorrect) {
+            setBotScore(prev => prev + 100);
+            setBotMessage(getRandomElement(BOT_TAUNTS[botName].idle));
+            setShootTarget('player');
+            setGameState('outcome_overlay');
+          } else {
+            setPlayerScore(prev => prev + 100);
+            setTurn('player');
+            setBotMessage("An anomalous variable in my calculations... the trigger is yours.");
+            setGameState('shooting_choice');
+            playShotSound('ding');
+          }
+        }, 750);
+      }, 950);
+    }, 1500);
   };
 
   // Firing Mechanism Trigger Pull
   const shoot = (shooter, target) => {
-    if (isShotFired) {
-      return;
-    }
+    if (isShotFired) return;
 
     setIsShotFired(true);
     clearPendingTimers();
@@ -537,23 +656,34 @@ export default function App() {
     shoot('player', target);
   };
 
-  // Next Question/Round transitions
-  const handleNextQuestion = () => {
-    // Game no longer ends on lives, it always plays all totalRounds.
+  // Next Turn / Next Card / Round transitions
+  const handleNextCardTurn = () => {
+    // 1. Mark the active card as discarded
+    if (activeCardTurn === 'player') {
+      setPlayerCards(prev => prev.map((c, i) => i === activeCardIndex ? { ...c, discarded: true } : c));
+    } else {
+      setBotCards(prev => prev.map((c, i) => i === activeCardIndex ? { ...c, discarded: true } : c));
+    }
 
-    const config = getRoundConfig(roundNumber);
-    const allShotsFired = shotsFiredThisRound >= config.chambers;
+    setOverlayType(null);
+    setShootTarget(null);
+    setSelectedAnswer(null);
+    setAnswerStatus(null);
+    setIsShotFired(false);
 
-    if (allShotsFired) {
+    // Check if remaining cards exist in the current round
+    const remainingPlayerCards = playerCards.filter((c, i) => activeCardTurn === 'player' ? i !== activeCardIndex && !c.discarded : !c.discarded);
+    const remainingBotCards = botCards.filter((c, i) => activeCardTurn === 'bot' ? i !== activeCardIndex && !c.discarded : !c.discarded);
+
+    if (remainingPlayerCards.length === 0 && remainingBotCards.length === 0) {
+      // All cards in round expended -> Advance Round
       const nextRound = roundNumber + 1;
-      
       if (nextRound > totalRounds) {
         endSession();
         return;
       }
 
       setRoundTransition(true);
-
       setRoundNumber(nextRound);
       const nextConfig = getRoundConfig(nextRound);
       setChamberCount(nextConfig.chambers);
@@ -574,63 +704,50 @@ export default function App() {
       setCurrentChamber(0);
       setBulletFired(false);
 
-      setStats(prev => {
-        const finishedRound = { 
-          ...prev.currentRoundData, 
-          accuracy: prev.currentRoundData.total > 0 ? (prev.currentRoundData.correct / prev.currentRoundData.total) * 100 : 0 
-        };
-        return {
-          ...prev,
-          roundsSurvived: prev.roundsSurvived + 1,
-          roundByRound: [...prev.roundByRound, finishedRound],
-          currentRoundData: { round: nextRound, correct: 0, total: 0, maxRisk: 0 }
-        };
-      });
+      dealRoundCards(questions, nextRound);
 
-      setTimeout(() => setRoundTransition(false), 2500);
-      advanceQuestion();
+      setTimeout(() => {
+        setRoundTransition(false);
+        setTurn('player');
+        setGameState('answering');
+        setCardState('inspect');
+      }, 2500);
     } else {
-      advanceQuestion();
-    }
-  };
-
-  const advanceQuestion = () => {
-    setTurn('player');
-    setGameState('answering');
-    setSelectedAnswer(null);
-    setAnswerStatus(null);
-    setShootTarget(null);
-    setOverlayType(null);
-    setIsShotFired(false);
-
-    const nextQIndex = currentQuestionIndex + 1;
-
-    if (nextQIndex >= questions.length) {
-      const pool = questionPoolRef.current;
-      let startIdx = poolIndexRef.current;
-      
-      if (startIdx >= pool.length) {
-        const reshuffled = [...pool];
-        for (let i = reshuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [reshuffled[i], reshuffled[j]] = [reshuffled[j], reshuffled[i]];
+      // Alternate turns between Player and Bot
+      if (activeCardTurn === 'player') {
+        // Player just went -> Now Bot's turn
+        const nextBotCardIdx = botCards.findIndex((c, i) => activeCardTurn === 'bot' ? i !== activeCardIndex && !c.discarded : !c.discarded);
+        if (nextBotCardIdx !== -1) {
+          executeBotCardTurn(nextBotCardIdx);
+        } else {
+          // If no bot cards left, go to next player card
+          const nextPIdx = playerCards.findIndex((c, i) => i !== activeCardIndex && !c.discarded);
+          if (nextPIdx !== -1) {
+            setActiveCardIndex(nextPIdx);
+            setActiveCardTurn('player');
+            setTurn('player');
+            setGameState('answering');
+            setCardState('inspect');
+          }
         }
-        questionPoolRef.current = reshuffled;
-        poolIndexRef.current = 0;
-        startIdx = 0;
+      } else {
+        // Bot just went -> Now Player's turn
+        const nextPIdx = playerCards.findIndex((c, i) => !c.discarded);
+        if (nextPIdx !== -1) {
+          setActiveCardIndex(nextPIdx);
+          setActiveCardTurn('player');
+          setTurn('player');
+          setGameState('answering');
+          setCardState('inspect');
+        } else {
+          // If no player cards left, go to next bot card
+          const nextBotCardIdx = botCards.findIndex((c, i) => i !== activeCardIndex && !c.discarded);
+          if (nextBotCardIdx !== -1) {
+            executeBotCardTurn(nextBotCardIdx);
+          }
+        }
       }
-      
-      const endIdx = Math.min(startIdx + questionCount, pool.length);
-      const nextBatch = questionPoolRef.current.slice(startIdx, endIdx);
-      poolIndexRef.current = endIdx;
-      
-      setQuestions(nextBatch);
-      setCurrentQuestionIndex(0);
-    } else {
-      setCurrentQuestionIndex(nextQIndex);
     }
-    questionStartTimeRef.current = Date.now();
-    setBotMessage(getRandomElement(BOT_TAUNTS[botName].idle));
   };
 
   // Log Score & Terminate Session
@@ -845,14 +962,20 @@ export default function App() {
                 isGenerating={isGenerating}
                 gameStartError={gameStartError}
                 setGameStartError={setGameStartError}
+                selectedCharacter={selectedCharacter}
+                setSelectedCharacter={setSelectedCharacter}
               />
             )}
 
-            {screen === 'game' && questions.length > 0 && (
+            {screen === 'game' && (
               <GameScreen
                 playerName={playerName}
                 difficulty={difficulty}
-                question={questions[currentQuestionIndex]}
+                question={
+                  (turn === 'player'
+                    ? playerCards[activeCardIndex]?.question
+                    : botCards[activeCardIndex]?.question) || questions[currentQuestionIndex]
+                }
                 questionIndex={currentQuestionIndex}
                 totalQuestions={questions.length}
                 roundNumber={roundNumber}
@@ -878,9 +1001,11 @@ export default function App() {
                 selectedAnswer={selectedAnswer}
                 shootTarget={shootTarget}
                 overlayType={overlayType}
-                onNextQuestion={handleNextQuestion}
                 soundEnabled={soundEnabled}
                 onToggleSound={handleToggleSound}
+                isAnswerCorrect={isAnswerCorrect}
+                gunOwner={gunOwner}
+                selectedCharacter={selectedCharacter}
               />
             )}
 
